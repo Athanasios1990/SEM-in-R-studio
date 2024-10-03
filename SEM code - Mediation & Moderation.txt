@@ -1,0 +1,281 @@
+#AthanasiosFalaras
+# Install and load the lavaan and dplyr package
+install.packages("lavaan")
+install.packages("dplyr")
+install.packages("psych")
+instal.packages("car")
+istall.packages("plspm")
+install.packages("semPlot")
+library(lavaan)
+library(dplyr)
+library(psych)
+library(car)
+library(plspm)
+library(semPlot)
+
+#Assume:
+#IV (independent variable) is Entrepreneurial_orientation
+#MV (mediator variable) is Management
+#DV (dependent variable) is Innovation
+#Moderator is Management
+
+#Design_measurement_model
+SEM_data$EO <- rowMeans(SEM_data[, c("EO1", "EO2", "EO3", "EO4")])
+SEM_data$MAN <- rowMeans(SEM_data[, c("MAN1", "MAN2", "MAN3")])
+SEM_data$INN <- rowMeans(SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")])
+#Interaction_term(moderation)
+SEM_data$Interaction <- SEM_data$EO * SEM_data$MAN
+
+#ge the model
+print(SEM_data)
+
+model <- '
+#Structural_model
+# Direct effect
+  INN ~ EO
+  # Mediation paths
+  MAN ~ EO
+  INN ~ MAN
+# Moderation effect
+  INN ~ Interaction
+'
+
+#Model_Vizualization
+# Fit the model
+fit <- sem(model, data = SEM_data)
+# Plot the model
+semPaths(fit, whatLabels = "est", layout = "tree2", edge.label.cex = 0.8, 
+         node.label.cex = 0.8, style = "ram", intercepts = FALSE)
+
+#Outer loadings
+# Example: Compute correlation if you have actual latent variables
+correlations <- cor(SEM_data[, c("EO1", "EO2", "EO3", "EO4", "MAN1", "MAN2", "MAN3", "Technological_innovation", "Organizational_innovation", "Marketing_innovation", "EO", "MAN", "INN")])
+
+# Extract correlations for EO and its indicators
+EO_correlations <- correlations["EO", c("EO1", "EO2", "EO3", "EO4")]
+print(EO_correlations)
+
+# Extract correlations for MAN and its indicators
+MAN_correlations <- correlations["MAN", c("MAN1", "MAN2", "MAN3")]
+print(MAN_correlations)
+
+# Extract correlations for INN and its indicators
+INN_correlations <- correlations["INN", c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
+print(INN_correlations)
+
+# Store the extracted correlations in a list
+correlation_list <- list(
+  EO = EO_correlations,
+  MAN = MAN_correlations,
+  INN = INN_correlations
+)
+
+#AVE
+# Step 1: Square the correlations
+EO_correlations_sq <- EO_correlations^2
+MAN_correlations_sq <- MAN_correlations^2
+INN_correlations_sq <- INN_correlations^2
+
+# Step 2: Sum the squared correlations
+sum_EO_sq <- sum(EO_correlations_sq)
+sum_MAN_sq <- sum(MAN_correlations_sq)
+sum_INN_sq <- sum(INN_correlations_sq)
+
+# Step 3: Calculate the AVE
+AVE_EO <- sum_EO_sq / length(EO_correlations_sq)
+AVE_MAN <- sum_MAN_sq / length(MAN_correlations_sq)
+AVE_INN <- sum_INN_sq / length(INN_correlations_sq)
+
+# Print the AVE for each latent construct
+print(AVE_EO)
+print(AVE_MAN)
+print(AVE_INN)
+
+#Composite reliabitliy
+# Step 1: Use the correlations as loadings (λ)
+# EO_correlations, MAN_correlations, and INN_correlations are already defined.
+
+# Step 2: Calculate the CR for EO
+sum_lambda_EO <- sum(EO_correlations)
+sum_lambda_sq_EO <- sum(EO_correlations^2)
+CR_EO <- (sum_lambda_EO^2) / (sum_lambda_EO^2 + sum(1 - EO_correlations^2))
+
+# Step 3: Calculate the CR for MAN
+sum_lambda_MAN <- sum(MAN_correlations)
+sum_lambda_sq_MAN <- sum(MAN_correlations^2)
+CR_MAN <- (sum_lambda_MAN^2) / (sum_lambda_MAN^2 + sum(1 - MAN_correlations^2))
+
+# Step 4: Calculate the CR for INN
+sum_lambda_INN <- sum(INN_correlations)
+sum_lambda_sq_INN <- sum(INN_correlations^2)
+CR_INN <- (sum_lambda_INN^2) / (sum_lambda_INN^2 + sum(1 - INN_correlations^2))
+
+# Print the Composite Reliability for each latent construct
+print(CR_EO)
+print(CR_MAN)
+print(CR_INN)
+
+#Spearman's rho
+# Step 1: Extract the data for each latent variable
+EO_data <- SEM_data[, c("EO1", "EO2", "EO3", "EO4")]
+MAN_data <- SEM_data[, c("MAN1", "MAN2", "MAN3")]
+INN_data <- SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
+
+# Step 2: Calculate Spearman's Rho for each latent variable and its indicators
+# Calculate for EO
+Spearman_EO <- apply(EO_data, 2, function(x) cor(x, SEM_data$EO, method = "spearman"))
+
+# Calculate for MAN
+Spearman_MAN <- apply(MAN_data, 2, function(x) cor(x, SEM_data$MAN, method = "spearman"))
+
+# Calculate for INN
+Spearman_INN <- apply(INN_data, 2, function(x) cor(x, SEM_data$INN, method = "spearman"))
+
+# Step 3: Calculate the average Spearman's Rho for each latent variable
+Avg_Spearman_EO <- mean(Spearman_EO)
+Avg_Spearman_MAN <- mean(Spearman_MAN)
+Avg_Spearman_INN <- mean(Spearman_INN)
+
+# Print the average Spearman's Rho for each latent construct
+Avg_Spearman_EO
+Avg_Spearman_MAN
+Avg_Spearman_INN
+
+#Cronbach's Alpha
+# Step 1: Extract the data for each latent variable from the dataframe
+EO_data <- SEM_data[, c("EO1", "EO2", "EO3", "EO4")]
+MAN_data <- SEM_data[, c("MAN1", "MAN2", "MAN3")]
+INN_data <- SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
+
+# Step 2: Calculate Cronbach's Alpha for each latent variable
+alpha_EO <- alpha(EO_data)
+alpha_MAN <- alpha(MAN_data)
+alpha_INN <- alpha(INN_data)
+
+# Print the Cronbach's Alpha for each latent construct
+print(alpha_EO)
+print(alpha_MAN)
+print(alpha_INN)
+
+#Discriminant validity - HTMT
+# Step 1: Prepare your data
+# Extract data for each construct
+EO_data <- SEM_data[, c("EO1", "EO2", "EO3", "EO4")]
+MAN_data <- SEM_data[, c("MAN1", "MAN2", "MAN3")]
+INN_data <- SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
+
+#Step2: Define the HTMT function
+compute_htmt <- function(data1, data2) {
+  # Compute the correlation matrix for each set of indicators
+  cor_data1 <- cor(data1, use = "pairwise.complete.obs")
+  cor_data2 <- cor(data2, use = "pairwise.complete.obs")
+  
+  # Correlations between indicators of different constructs
+  between_correlation <- cor(data1, data2, use = "pairwise.complete.obs")
+  
+  # Average within-construct correlations
+  within_correlation1 <- mean(cor_data1[lower.tri(cor_data1)], na.rm = TRUE)
+  within_correlation2 <- mean(cor_data2[lower.tri(cor_data2)], na.rm = TRUE)
+  
+  # HTMT calculation
+  htmt_value <- mean(between_correlation, na.rm = TRUE) / sqrt(within_correlation1 * within_correlation2)
+  return(htmt_value)
+}
+
+compute_htmt(EO_data, MAN_data)
+compute_htmt(EO_data, INN_data)
+compute_htmt(MAN_data, INN_data)
+
+# Install the car package if not already installed
+#VIFs including moderation
+# Fit linear models for each predictor
+model_EO <- lm(EO ~ MAN + INN + Interaction, data = SEM_data)
+# Calculate VIFs
+vif_EO <- vif(model_EO)
+print(vif_EO)
+
+#moderation
+path_matrix <- matrix(c(
+  0, 0, 0, 0,  # Paths from EO to MAN, INN, EO_MAN_interaction
+  1, 0, 0, 0,  # Paths from MAN to INN, EO_MAN_interaction
+  1, 1, 0, 0,  # Paths from INN to itself (no further paths)
+  1, 1, 1, 0   # Paths from Interaction to itself (no further paths)
+), nrow = 4, byrow = TRUE)
+
+# Name the rows and columns for clarity
+rownames(path_matrix) <- colnames(path_matrix) <- c("EO", "MAN", "Interaction", "INN")
+print(path_matrix)
+
+blocks <- list(
+  c("EO1", "EO2", "EO3", "EO4"),                 # Manifest variables for EO
+  c("MAN1", "MAN2", "MAN3"),                      # Manifest variables for MAN
+  c("Technological_innovation", "Organizational_innovation", "Marketing_innovation"),  # Manifest variables for INN
+  c("Interaction")                         # Manifest variable for Interaction Term
+)
+
+# Specify the modes of the blocks (e.g., A for reflective, B for formative)
+modes <- c("A", "A", "A", "B")  # Mode "B" for the interaction term if it is formative
+
+#PLS path coefficients
+# Fit the PLS-PM model
+pls_model <- plspm(SEM_data, path_matrix, blocks, modes, boot.val = TRUE)
+summary(pls_model)
+
+# Fit the model using lavaan
+fit <- sem(model, data = SEM_data)
+#F square including moderation
+#F square for EO
+# Fit the full model with EO as a predictor
+full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
+# Fit the reduced model without EO
+reduced_model <- lm(INN ~ MAN + Interaction, data = SEM_data)
+# Extract R-squared values
+R2_full <- summary(full_model)$r.squared
+R2_reduced <- summary(reduced_model)$r.squared
+# Calculate f^2
+f2_EO <- (R2_full - R2_reduced) / (1 - R2_full)
+print(paste("Effect size f^2 for EO:", round(f2_EO, 4)))
+
+#F square for MAN
+# Fit the full model with MAN as a predictor
+full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
+# Fit the reduced model without EO
+reduced_model <- lm(INN ~ EO + Interaction, data = SEM_data)
+# Extract R-squared values
+R2_full <- summary(full_model)$r.squared
+R2_reduced <- summary(reduced_model)$r.squared
+# Calculate f^2
+f2_MAN <- (R2_full - R2_reduced) / (1 - R2_full)
+print(paste("Effect size f^2 for MAN:", round(f2_MAN, 4)))
+
+#F square for Interaction
+# Fit the full model with Interaction as a predictor
+full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
+# Fit the reduced model without EO
+reduced_model <- lm(INN ~ EO + MAN, data = SEM_data)
+# Extract R-squared values
+R2_full <- summary(full_model)$r.squared
+R2_reduced <- summary(reduced_model)$r.squared
+# Calculate f^2
+f2_Interaction <- (R2_full - R2_reduced) / (1 - R2_full)
+print(paste("Effect size f^2 for MAN:", round(f2_Interaction, 4)))
+
+#Q square
+# Fit the linear model
+full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
+# Predict and store the values
+SEM_data$predicted_INN <- predict(full_model, newdata = SEM_data)
+# Print the updated dataframe with predicted values
+head(SEM_data)
+# Calculate the differences
+SEM_data$difference_INN <- SEM_data$INN - SEM_data$predicted_INN
+# Print the updated dataframe with the new column
+head(SEM_data)
+# Compute Sum of Squared Residuals (SSR)
+SSR <- sum((SEM_data$INN - SEM_data$predicted_INN)^2)
+# Compute Total Sum of Squares (SST)
+SST <- sum((SEM_data$INN - mean(SEM_data$INN))^2)
+# Calculate Q^2
+Q2 <- 1 - (SSR / SST)
+# Print the Q^2 value
+print(paste("Q^2:", round(Q2, 4)))
