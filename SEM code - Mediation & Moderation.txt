@@ -1,281 +1,350 @@
 #AthanasiosFalaras
-# Install and load the lavaan and dplyr package
+# Install and load all the necessary packages
+install.packages("readxl")
 install.packages("lavaan")
 install.packages("dplyr")
 install.packages("psych")
-instal.packages("car")
-istall.packages("plspm")
+install.packages("car")
+install.packages("plspm")
+install.packages("lme4")
 install.packages("semPlot")
+
+library(readxl)
 library(lavaan)
 library(dplyr)
 library(psych)
 library(car)
 library(plspm)
+library(lme4)
 library(semPlot)
 
-#Assume:
-#IV (independent variable) is Entrepreneurial_orientation
-#MV (mediator variable) is Management
-#DV (dependent variable) is Innovation
-#Moderator is Management
+# --- Pre-flight: fix name collisions & types ---
+lv_names <- c("PI","PT","PPK","GPV")
+collide <- intersect(names(Dataset), lv_names)
 
-#Design_measurement_model
-SEM_data$EO <- rowMeans(SEM_data[, c("EO1", "EO2", "EO3", "EO4")])
-SEM_data$MAN <- rowMeans(SEM_data[, c("MAN1", "MAN2", "MAN3")])
-SEM_data$INN <- rowMeans(SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")])
-#Interaction_term(moderation)
-SEM_data$Interaction <- SEM_data$EO * SEM_data$MAN
-
-#ge the model
-print(SEM_data)
-
-model <- '
-#Structural_model
-# Direct effect
-  INN ~ EO
-  # Mediation paths
-  MAN ~ EO
-  INN ~ MAN
-# Moderation effect
-  INN ~ Interaction
-'
-
-#Model_Vizualization
-# Fit the model
-fit <- sem(model, data = SEM_data)
-# Plot the model
-semPaths(fit, whatLabels = "est", layout = "tree2", edge.label.cex = 0.8, 
-         node.label.cex = 0.8, style = "ram", intercepts = FALSE)
-
-#Outer loadings
-# Example: Compute correlation if you have actual latent variables
-correlations <- cor(SEM_data[, c("EO1", "EO2", "EO3", "EO4", "MAN1", "MAN2", "MAN3", "Technological_innovation", "Organizational_innovation", "Marketing_innovation", "EO", "MAN", "INN")])
-
-# Extract correlations for EO and its indicators
-EO_correlations <- correlations["EO", c("EO1", "EO2", "EO3", "EO4")]
-print(EO_correlations)
-
-# Extract correlations for MAN and its indicators
-MAN_correlations <- correlations["MAN", c("MAN1", "MAN2", "MAN3")]
-print(MAN_correlations)
-
-# Extract correlations for INN and its indicators
-INN_correlations <- correlations["INN", c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
-print(INN_correlations)
-
-# Store the extracted correlations in a list
-correlation_list <- list(
-  EO = EO_correlations,
-  MAN = MAN_correlations,
-  INN = INN_correlations
-)
-
-#AVE
-# Step 1: Square the correlations
-EO_correlations_sq <- EO_correlations^2
-MAN_correlations_sq <- MAN_correlations^2
-INN_correlations_sq <- INN_correlations^2
-
-# Step 2: Sum the squared correlations
-sum_EO_sq <- sum(EO_correlations_sq)
-sum_MAN_sq <- sum(MAN_correlations_sq)
-sum_INN_sq <- sum(INN_correlations_sq)
-
-# Step 3: Calculate the AVE
-AVE_EO <- sum_EO_sq / length(EO_correlations_sq)
-AVE_MAN <- sum_MAN_sq / length(MAN_correlations_sq)
-AVE_INN <- sum_INN_sq / length(INN_correlations_sq)
-
-# Print the AVE for each latent construct
-print(AVE_EO)
-print(AVE_MAN)
-print(AVE_INN)
-
-#Composite reliabitliy
-# Step 1: Use the correlations as loadings (λ)
-# EO_correlations, MAN_correlations, and INN_correlations are already defined.
-
-# Step 2: Calculate the CR for EO
-sum_lambda_EO <- sum(EO_correlations)
-sum_lambda_sq_EO <- sum(EO_correlations^2)
-CR_EO <- (sum_lambda_EO^2) / (sum_lambda_EO^2 + sum(1 - EO_correlations^2))
-
-# Step 3: Calculate the CR for MAN
-sum_lambda_MAN <- sum(MAN_correlations)
-sum_lambda_sq_MAN <- sum(MAN_correlations^2)
-CR_MAN <- (sum_lambda_MAN^2) / (sum_lambda_MAN^2 + sum(1 - MAN_correlations^2))
-
-# Step 4: Calculate the CR for INN
-sum_lambda_INN <- sum(INN_correlations)
-sum_lambda_sq_INN <- sum(INN_correlations^2)
-CR_INN <- (sum_lambda_INN^2) / (sum_lambda_INN^2 + sum(1 - INN_correlations^2))
-
-# Print the Composite Reliability for each latent construct
-print(CR_EO)
-print(CR_MAN)
-print(CR_INN)
-
-#Spearman's rho
-# Step 1: Extract the data for each latent variable
-EO_data <- SEM_data[, c("EO1", "EO2", "EO3", "EO4")]
-MAN_data <- SEM_data[, c("MAN1", "MAN2", "MAN3")]
-INN_data <- SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
-
-# Step 2: Calculate Spearman's Rho for each latent variable and its indicators
-# Calculate for EO
-Spearman_EO <- apply(EO_data, 2, function(x) cor(x, SEM_data$EO, method = "spearman"))
-
-# Calculate for MAN
-Spearman_MAN <- apply(MAN_data, 2, function(x) cor(x, SEM_data$MAN, method = "spearman"))
-
-# Calculate for INN
-Spearman_INN <- apply(INN_data, 2, function(x) cor(x, SEM_data$INN, method = "spearman"))
-
-# Step 3: Calculate the average Spearman's Rho for each latent variable
-Avg_Spearman_EO <- mean(Spearman_EO)
-Avg_Spearman_MAN <- mean(Spearman_MAN)
-Avg_Spearman_INN <- mean(Spearman_INN)
-
-# Print the average Spearman's Rho for each latent construct
-Avg_Spearman_EO
-Avg_Spearman_MAN
-Avg_Spearman_INN
-
-#Cronbach's Alpha
-# Step 1: Extract the data for each latent variable from the dataframe
-EO_data <- SEM_data[, c("EO1", "EO2", "EO3", "EO4")]
-MAN_data <- SEM_data[, c("MAN1", "MAN2", "MAN3")]
-INN_data <- SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
-
-# Step 2: Calculate Cronbach's Alpha for each latent variable
-alpha_EO <- alpha(EO_data)
-alpha_MAN <- alpha(MAN_data)
-alpha_INN <- alpha(INN_data)
-
-# Print the Cronbach's Alpha for each latent construct
-print(alpha_EO)
-print(alpha_MAN)
-print(alpha_INN)
-
-#Discriminant validity - HTMT
-# Step 1: Prepare your data
-# Extract data for each construct
-EO_data <- SEM_data[, c("EO1", "EO2", "EO3", "EO4")]
-MAN_data <- SEM_data[, c("MAN1", "MAN2", "MAN3")]
-INN_data <- SEM_data[, c("Technological_innovation", "Organizational_innovation", "Marketing_innovation")]
-
-#Step2: Define the HTMT function
-compute_htmt <- function(data1, data2) {
-  # Compute the correlation matrix for each set of indicators
-  cor_data1 <- cor(data1, use = "pairwise.complete.obs")
-  cor_data2 <- cor(data2, use = "pairwise.complete.obs")
-  
-  # Correlations between indicators of different constructs
-  between_correlation <- cor(data1, data2, use = "pairwise.complete.obs")
-  
-  # Average within-construct correlations
-  within_correlation1 <- mean(cor_data1[lower.tri(cor_data1)], na.rm = TRUE)
-  within_correlation2 <- mean(cor_data2[lower.tri(cor_data2)], na.rm = TRUE)
-  
-  # HTMT calculation
-  htmt_value <- mean(between_correlation, na.rm = TRUE) / sqrt(within_correlation1 * within_correlation2)
-  return(htmt_value)
+# Option A (recommended): rename any colliding observed columns so they don't clash with latent names
+if (length(collide)) {
+  message("Renaming observed variables that collide with latent names: ",
+          paste(collide, collapse = ", "))
+  for (nm in collide) {
+    names(Dataset)[names(Dataset) == nm] <- paste0(nm, "_obs")
+  }
 }
 
-compute_htmt(EO_data, MAN_data)
-compute_htmt(EO_data, INN_data)
-compute_htmt(MAN_data, INN_data)
+# --- Model & fit ---
+model <- '
+  PI  =~ PI1 + PI2 + PI3 + PI4
+  PT  =~ PT1 + PT2 + PT3 + PT4
+  PPK =~ PPK1 + PPK2 + PPK3
+  GPV =~ GPV1 + GPV2 + GPV3
 
-# Install the car package if not already installed
-#VIFs including moderation
-# Fit linear models for each predictor
-model_EO <- lm(EO ~ MAN + INN + Interaction, data = SEM_data)
-# Calculate VIFs
-vif_EO <- vif(model_EO)
-print(vif_EO)
+  #Paths
+  PI  ~ GPV + PT + PPK + Age + Income + Work_out_frequency
+  PT  ~ GPV
+  PPK ~ GPV
+'
 
-#moderation
-path_matrix <- matrix(c(
-  0, 0, 0, 0,  # Paths from EO to MAN, INN, EO_MAN_interaction
-  1, 0, 0, 0,  # Paths from MAN to INN, EO_MAN_interaction
-  1, 1, 0, 0,  # Paths from INN to itself (no further paths)
-  1, 1, 1, 0   # Paths from Interaction to itself (no further paths)
-), nrow = 4, byrow = TRUE)
-
-# Name the rows and columns for clarity
-rownames(path_matrix) <- colnames(path_matrix) <- c("EO", "MAN", "Interaction", "INN")
-print(path_matrix)
-
-blocks <- list(
-  c("EO1", "EO2", "EO3", "EO4"),                 # Manifest variables for EO
-  c("MAN1", "MAN2", "MAN3"),                      # Manifest variables for MAN
-  c("Technological_innovation", "Organizational_innovation", "Marketing_innovation"),  # Manifest variables for INN
-  c("Interaction")                         # Manifest variable for Interaction Term
+fit <- lavaan::sem(
+  model,
+  data      = Dataset,
+  estimator = "MLR",
+  missing   = "fiml",
+  std.lv    = TRUE
 )
 
-# Specify the modes of the blocks (e.g., A for reflective, B for formative)
-modes <- c("A", "A", "A", "B")  # Mode "B" for the interaction term if it is formative
+# Quick diagnostics
+print(summary(fit, standardized = TRUE, fit.measures = TRUE))
 
-#PLS path coefficients
-# Fit the PLS-PM model
-pls_model <- plspm(SEM_data, path_matrix, blocks, modes, boot.val = TRUE)
+# Optional: visualize
+semPlot::semPaths(
+  fit,
+  whatLabels     = "std",
+  layout         = "tree2",
+  edge.label.cex = 0.8,
+  node.label.cex = 0.8,
+  style          = "ram",
+  intercepts     = FALSE
+)
+
+# Extract standardized outer loadings (and fail fast if no measurement model)
+# 0) Sanity checks
+stopifnot(inherits(fit, "lavaan"))
+pe <- parameterEstimates(fit, standardized = TRUE)
+if (!any(pe$op == "=~")) {
+  stop("No '=~' relations found in 'fit'. Fit a latent measurement model (e.g., 'PI =~ PI1 + ...').")
+}
+# 1) Tidy table of standardized loadings
+loadings_tbl <- subset(
+  pe,
+  op == "=~",
+  select = c(lhs, rhs, std.all, se, z, pvalue)
+)
+names(loadings_tbl) <- c("factor", "item", "loading_std", "se", "z", "pvalue")
+# 2) Print (or keep as object)
+print(loadings_tbl)
+# 3) Optional: matrix form from the standardized solution
+lambda_std <- lavInspect(fit, "std")$lambda  # items x factors
+print(lambda_std)
+
+# ===== AVE & Composite Reliability (ρc) =====
+# Ορισμός blocks
+blocks <- list(
+  PI  = c("PI1","PI2","PI3","PI4"),
+  PT  = c("PT1","PT2","PT3","PT4"),
+  PPK = c("PPK1","PPK2","PPK3"),
+  GPV = c("GPV1","GPV2","GPV3")
+)
+
+# A) semTools
+if (requireNamespace("semTools", quietly = TRUE)) {
+  CR_vec  <- semTools::compRelSEM(fit)   # composite reliability per factor
+  AVE_vec <- semTools::AVE(fit)          # AVE per factor
+  print(CR_vec)
+  print(AVE_vec)
+} else {
+  # B) Χειροκίνητα από την standardized λύση (χωρίς semTools)
+  pe_std <- parameterEstimates(fit, standardized = TRUE)
+  std    <- lavInspect(fit, "std")
+  theta_diag <- diag(std$theta); names(theta_diag) <- rownames(std$theta)
+
+  get_cr_ave <- function(fct, items){
+    # standardized loadings λ_i
+    lam <- pe_std$std.all[pe_std$op == "=~" & pe_std$lhs == fct & pe_std$rhs %in% items]
+    # error variances θ_i από τη θ
+    th  <- theta_diag[items]
+    # ρc (Jöreskog): (Σλ)^2 / [ (Σλ)^2 + Σθ ]
+    cr  <- (sum(lam, na.rm=TRUE)^2) / ((sum(lam, na.rm=TRUE)^2) + sum(th, na.rm=TRUE))
+    # AVE: Σλ^2 / [ Σλ^2 + Σθ ]
+    ave <- (sum(lam^2, na.rm=TRUE)) / ((sum(lam^2, na.rm=TRUE)) + sum(th, na.rm=TRUE))
+    c(CR = cr, AVE = ave)
+  }
+
+  out <- t(sapply(names(blocks), function(f) get_cr_ave(f, blocks[[f]])))
+  print(out)
+}
+
+
+# Spearman item–latent correlations (CB-SEM)
+# 0) Preconditions
+stopifnot(inherits(fit, "lavaan"))
+# 1) Define item blocks
+items <- list(
+  PI  = c("PI1","PI2","PI3","PI4"),
+  PT  = c("PT1","PT2","PT3","PT4"),
+  PPK = c("PPK1","PPK2","PPK3"),
+  GPV = c("GPV1","GPV2","GPV3")
+)
+# 2) Sanity check: all item columns exist
+missing_cols <- setdiff(unlist(items), names(Dataset))
+if (length(missing_cols)) stop("Missing item columns: ", paste(missing_cols, collapse = ", "))
+# 3) Ensure numeric (handles factors/characters)
+to_num <- function(x) suppressWarnings(as.numeric(as.character(x)))
+Dataset[unlist(items)] <- lapply(Dataset[unlist(items)], to_num)
+# 4) Get latent factor scores
+scores <- lavPredict(fit, method = "regression", type = "lv")
+# 5) Compute Spearman correlations item ↔ corresponding latent score
+spearman_tbl <- do.call(rbind, lapply(names(items), function(f) {
+  itms <- items[[f]]
+  data.frame(
+    construct = f,
+    item      = itms,
+    rho       = sapply(itms, function(it)
+      suppressWarnings(cor(Dataset[[it]], scores[, f],
+                           method = "spearman", use = "pairwise.complete.obs")))
+  )
+}))
+# 6) Averages per construct (note: factor sign is arbitrary)
+avg_rho     <- tapply(spearman_tbl$rho,      spearman_tbl$construct, function(v) mean(v, na.rm = TRUE))
+avg_abs_rho <- tapply(abs(spearman_tbl$rho), spearman_tbl$construct, function(v) mean(v, na.rm = TRUE))
+print(spearman_tbl)
+print(avg_rho)       # mean Spearman (can be negative if factor sign flips)
+print(avg_abs_rho)   # mean absolute Spearman (sign-invariant)
+
+# Cronbach's alpha per construct (items only; no composites)
+# 0) Preconditions
+stopifnot(requireNamespace("psych", quietly = TRUE))
+# 1) Define item sets
+items <- list(
+  PI  = c("PI1","PI2","PI3","PI4"),
+  PT  = c("PT1","PT2","PT3","PT4"),
+  PPK = c("PPK1","PPK2","PPK3"),
+  GPV = c("GPV1","GPV2","GPV3")
+)
+# 2) Sanity check
+missing_cols <- setdiff(unlist(items), names(Dataset))
+if (length(missing_cols)) stop("Missing item columns: ", paste(missing_cols, collapse = ", "))
+# 3) Ensure numeric
+to_num <- function(x) suppressWarnings(as.numeric(as.character(x)))
+Dataset[unlist(items)] <- lapply(Dataset[unlist(items)], to_num)
+# 4) Compute Cronbach's alpha (pairwise handling of NAs, keying allowed)
+alphas <- lapply(names(items), function(f) {
+  X <- Dataset[ items[[f]] ]
+  # Drop rows that are entirely NA for this block
+  X <- X[rowSums(is.na(X)) < ncol(X), , drop = FALSE]
+  a <- psych::alpha(X, check.keys = TRUE, warnings = FALSE)
+  data.frame(construct = f,
+             alpha_raw = a$total$raw_alpha,
+             alpha_std = a$total$std.alpha,
+             stringsAsFactors = FALSE)
+})
+alphas <- do.call(rbind, alphas)
+print(alphas)
+
+# HTMT for all construct pairs from item blocks (no pre-existing *_data objects needed)
+# 1) Define item blocks
+items <- list(
+  PI  = c("PI1","PI2","PI3","PI4"),
+  PT  = c("PT1","PT2","PT3","PT4"),
+  PPK = c("PPK1","PPK2","PPK3"),
+  GPV = c("GPV1","GPV2","GPV3")
+)
+# 2) Sanity checks
+missing_cols <- setdiff(unlist(items), names(Dataset))
+if (length(missing_cols)) stop("Missing item columns: ", paste(missing_cols, collapse = ", "))
+if (any(lengths(items) < 2L)) stop("Each construct must have at least 2 items.")
+# 3) Helper: numeric coercion
+to_num_df <- function(df) as.data.frame(lapply(df, function(x) suppressWarnings(as.numeric(as.character(x)))))
+# 4) HTMT function (absolute correlations, NA-robust)
+compute_htmt <- function(data1, data2, method = "pearson", use = "pairwise.complete.obs") {
+  X <- to_num_df(data1); Y <- to_num_df(data2)
+  cor_within_X <- stats::cor(X, use = use, method = method)
+  cor_within_Y <- stats::cor(Y, use = use, method = method)
+  wX <- abs(cor_within_X[lower.tri(cor_within_X)])
+  wY <- abs(cor_within_Y[lower.tri(cor_within_Y)])
+  b  <- abs(as.vector(stats::cor(X, Y, use = use, method = method)))
+  if (!length(b) || !length(wX) || !length(wY)) return(NA_real_)
+  mean(b, na.rm = TRUE) / sqrt(mean(wX, na.rm = TRUE) * mean(wY, na.rm = TRUE))
+}
+# 5) Compute HTMT for all pairs
+pairs <- combn(names(items), 2, simplify = FALSE)
+htmt_results <- do.call(rbind, lapply(pairs, function(pr) {
+  X <- Dataset[ items[[pr[1]]] ]
+  Y <- Dataset[ items[[pr[2]]] ]
+  data.frame(construct1 = pr[1], construct2 = pr[2],
+             HTMT = compute_htmt(X, Y))
+}))
+print(htmt_results)
+
+# VIFs for the PI structural equation using latent factor scores (no composites)
+# 0) Preconditions
+stopifnot(inherits(fit, "lavaan"))
+if (!requireNamespace("car", quietly = TRUE)) stop("Package 'car' is required for VIF.")
+# 1) Get latent factor scores
+scores <- lavPredict(fit, method = "regression", type = "lv")
+# 2) Build analysis frame (ensure numeric controls)
+to_num <- function(x) suppressWarnings(as.numeric(as.character(x)))
+dat <- data.frame(
+  PI  = as.numeric(scores[, "PI"]),
+  PT  = as.numeric(scores[, "PT"]),
+  PPK = as.numeric(scores[, "PPK"]),
+  GPV = as.numeric(scores[, "GPV"]),
+  Age = to_num(Dataset$Age),
+  Income = to_num(Dataset$Income),
+  Work_out_frequency = to_num(Dataset$Work_out_frequency)
+)
+# 3) Fit linear model for the PI structural part and compute VIFs
+dat_complete <- dat[complete.cases(dat[, c("PT","PPK","GPV","Age","Income","Work_out_frequency")]), ]
+model_PI <- lm(PI ~ PT + PPK + GPV + Age + Income + Work_out_frequency, data = dat_complete)
+vif_PI <- car::vif(model_PI)
+print(vif_PI)
+
+# --- PLS-PM: clean & robust setup ---
+# 0) Preconditions: columns exist and are numeric-friendly
+item_blocks <- list(
+  GPV = c("GPV1","GPV2","GPV3"),
+  PT  = c("PT1","PT2","PT3","PT4"),
+  PPK = c("PPK1","PPK2","PPK3"),
+  PI  = c("PI1","PI2","PI3","PI4")
+)
+controls <- c("Age","Income","Work_out_frequency")
+needed_cols <- c(unlist(item_blocks), controls)
+missing_cols <- setdiff(needed_cols, names(Dataset))
+if (length(missing_cols)) stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+# Coerce items/controls to numeric (handles factors/characters)
+to_num <- function(x) suppressWarnings(as.numeric(as.character(x)))
+Dataset[needed_cols] <- lapply(Dataset[needed_cols], to_num)
+# 1) Latent order: exogenous -> mediators -> ultimate endogenous
+lv_order <- c("Age", "Income", "Work_out_frequency", "GPV", "PT", "PPK", "PI")
+# 2) Inner (path) model: columns -> rows
+inner <- matrix(0, length(lv_order), length(lv_order),
+                dimnames = list(lv_order, lv_order))
+# Mediators
+inner["PT",  "GPV"] <- 1   # GPV -> PT
+inner["PPK", "GPV"] <- 1   # GPV -> PPK
+# Ultimate endogenous
+inner["PI", c("PT","PPK","GPV","Age","Income","Work_out_frequency")] <- 1  # predictors -> PI
+# 3) Outer (measurement) model: blocks in the SAME order as lv_order
+outer <- list(
+  Age                = "Age",                      # single-indicator
+  Income             = "Income",                   # single-indicator
+  Work_out_frequency = "Work_out_frequency",       # single-indicator
+  GPV                = item_blocks$GPV,            # reflective
+  PT                 = item_blocks$PT,             # reflective
+  PPK                = item_blocks$PPK,            # reflective
+  PI                 = item_blocks$PI              # reflective
+)
+# Modes: "A" = reflective (OK for single-indicator too)
+modes <- rep("A", length(outer))
+# 4) Run PLS-PM (use positional args to avoid name-case issues)
+#    scheme = "path" is common for mediation; scaled = TRUE standardizes manifests
+pls_model <- plspm(
+  Dataset, inner, outer, modes,
+  scheme   = "path",
+  scaled   = TRUE,
+  boot.val = TRUE,
+  br       = 5000         # robust bootstrap
+)
+# 5) Inspect results
+print(pls_model)
 summary(pls_model)
 
-# Fit the model using lavaan
-fit <- sem(model, data = SEM_data)
-#F square including moderation
-#F square for EO
-# Fit the full model with EO as a predictor
-full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
-# Fit the reduced model without EO
-reduced_model <- lm(INN ~ MAN + Interaction, data = SEM_data)
-# Extract R-squared values
-R2_full <- summary(full_model)$r.squared
-R2_reduced <- summary(reduced_model)$r.squared
-# Calculate f^2
-f2_EO <- (R2_full - R2_reduced) / (1 - R2_full)
-print(paste("Effect size f^2 for EO:", round(f2_EO, 4)))
+# -------------------------
+# A) f^2 effect sizes (Cohen) for all PI predictors
+# -------------------------
+full_formula <- PI ~ PT + PPK + GPV + Age + Income + Work_out_frequency
+m_full <- lm(full_formula, data = dat)
+R2_full <- summary(m_full)$r.squared
 
-#F square for MAN
-# Fit the full model with MAN as a predictor
-full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
-# Fit the reduced model without EO
-reduced_model <- lm(INN ~ EO + Interaction, data = SEM_data)
-# Extract R-squared values
-R2_full <- summary(full_model)$r.squared
-R2_reduced <- summary(reduced_model)$r.squared
-# Calculate f^2
-f2_MAN <- (R2_full - R2_reduced) / (1 - R2_full)
-print(paste("Effect size f^2 for MAN:", round(f2_MAN, 4)))
+preds <- c("PT","PPK","GPV","Age","Income","Work_out_frequency")
 
-#F square for Interaction
-# Fit the full model with Interaction as a predictor
-full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
-# Fit the reduced model without EO
-reduced_model <- lm(INN ~ EO + MAN, data = SEM_data)
-# Extract R-squared values
-R2_full <- summary(full_model)$r.squared
-R2_reduced <- summary(reduced_model)$r.squared
-# Calculate f^2
-f2_Interaction <- (R2_full - R2_reduced) / (1 - R2_full)
-print(paste("Effect size f^2 for MAN:", round(f2_Interaction, 4)))
+f2_vals <- sapply(preds, function(p) {
+  red_formula <- as.formula(
+    paste("PI ~", paste(setdiff(c("PT","PPK","GPV","Age","Income","Work_out_frequency"), p),
+                        collapse = " + "))
+  )
+  R2_red <- summary(lm(red_formula, data = dat))$r.squared
+  (R2_full - R2_red) / (1 - R2_full)
+})
 
-#Q square
-# Fit the linear model
-full_model <- lm(INN ~ EO + MAN + Interaction, data = SEM_data)
-# Predict and store the values
-SEM_data$predicted_INN <- predict(full_model, newdata = SEM_data)
-# Print the updated dataframe with predicted values
-head(SEM_data)
-# Calculate the differences
-SEM_data$difference_INN <- SEM_data$INN - SEM_data$predicted_INN
-# Print the updated dataframe with the new column
-head(SEM_data)
-# Compute Sum of Squared Residuals (SSR)
-SSR <- sum((SEM_data$INN - SEM_data$predicted_INN)^2)
-# Compute Total Sum of Squares (SST)
-SST <- sum((SEM_data$INN - mean(SEM_data$INN))^2)
-# Calculate Q^2
-Q2 <- 1 - (SSR / SST)
-# Print the Q^2 value
-print(paste("Q^2:", round(Q2, 4)))
+# Interpretation Cohen (.02=.small, .15=.medium, .35=.large)
+cohen_label <- function(x) ifelse(x < .02, "trivial",
+                           ifelse(x < .15, "small",
+                           ifelse(x < .35, "medium", "large")))
+f2_tbl <- data.frame(predictor = preds,
+                     f2 = as.numeric(f2_vals),
+                     effect = sapply(as.numeric(f2_vals), cohen_label))
+f2_tbl <- f2_tbl[order(-f2_tbl$f2), ]
+print(f2_tbl, row.names = FALSE)
+
+# -------------------------
+# B) Q^2 via k-fold cross-validation (out-of-sample)
+# -------------------------
+set.seed(1234)
+k <- min(10, nrow(dat))  # up to 10 folds
+fold_id <- sample(rep(1:k, length.out = nrow(dat)))
+
+y <- dat$PI
+yhat_cv <- rep(NA_real_, length(y))
+
+for (j in 1:k) {
+  test_idx  <- which(fold_id == j)
+  train_idx <- setdiff(seq_len(nrow(dat)), test_idx)
+  m_cv <- lm(full_formula, data = dat[train_idx, , drop = FALSE])
+  yhat_cv[test_idx] <- predict(m_cv, newdata = dat[test_idx, , drop = FALSE])
+}
+
+PRESS <- sum((y - yhat_cv)^2)                 # prediction error (CV)
+TSS   <- sum((y - mean(y, na.rm = TRUE))^2)   # total sum of squares
+Q2    <- 1 - PRESS / TSS
+
+cat(sprintf("Q^2 (k-fold CV): %.4f\n", Q2))
