@@ -1,0 +1,246 @@
+#Athanasios_Falaras
+# =========================================
+# 1. Install and load required packages
+# =========================================
+install.packages("seminr")
+install.packages("psych")
+install.packages("car")
+install.packages("DiagrammeR")
+
+library(seminr)
+library(psych)
+library(car)
+library(DiagrammeR)
+
+# =========================================
+# 3. Check that all required variables exist
+# =========================================
+required_vars <- c(
+  "EO1", "EO2", "EO3", "EO4",
+  "MAN1", "MAN2", "MAN3",
+  "INN1", "INN2", "INN3"
+)
+
+# =========================================
+# 4. Measurement model
+# Reflective constructs plus interaction term
+# =========================================
+measurement_model <- constructs(
+  reflective("EO",  multi_items("EO", 1:4)),
+  reflective("MAN", multi_items("MAN", 1:3)),
+  reflective("INN", multi_items("INN", 1:3)),
+  interaction_term(iv = "EO", moderator = "MAN", method = two_stage)
+)
+
+# =========================================
+# 5. Structural model
+# MAN acts both as mediator and moderator
+# =========================================
+structural_model <- relationships(
+  paths(from = "EO",     to = c("MAN", "INN")),
+  paths(from = "MAN",    to = "INN"),
+  paths(from = "EO*MAN", to = "INN")
+)
+
+# =========================================
+# 6. Estimate the PLS-SEM model
+# =========================================
+pls_model <- estimate_pls(
+  data = SEM_data,
+  measurement_model = measurement_model,
+  structural_model = structural_model,
+  inner_weights = path_weighting
+)
+
+# =========================================
+# 7. Bootstrap the model
+# =========================================
+boot_pls <- bootstrap_model(
+  seminr_model = pls_model,
+  nboot = 5000,
+  cores = 1
+)
+
+# =========================================
+# 8. Display core model results
+# =========================================
+cat("\n================ MODEL SUMMARY ================\n")
+summary(pls_model)
+
+cat("\n================ BOOTSTRAP SUMMARY ================\n")
+summary(boot_pls)
+
+cat("\n================ PATH COEFFICIENTS ================\n")
+print(pls_model$path_coef)
+
+cat("\n================ OUTER LOADINGS ================\n")
+print(pls_model$outer_loadings)
+
+# =========================================
+# 9b. Discriminant validity: HTMT
+# Manual calculation
+# =========================================
+
+# Define indicator sets
+EO_items  <- SEM_data[, c("EO1", "EO2", "EO3", "EO4")]
+MAN_items <- SEM_data[, c("MAN1", "MAN2", "MAN3")]
+INN_items <- SEM_data[, c("INN1", "INN2", "INN3")]
+
+# Function to calculate HTMT
+compute_htmt <- function(data1, data2) {
+  # Correlations within constructs
+  cor_data1 <- cor(data1, use = "pairwise.complete.obs")
+  cor_data2 <- cor(data2, use = "pairwise.complete.obs")
+  
+  # Correlations between constructs
+  cor_between <- cor(data1, data2, use = "pairwise.complete.obs")
+  
+  # Mean of absolute heterotrait-heteromethod correlations
+  mean_between <- mean(abs(cor_between), na.rm = TRUE)
+  
+  # Mean of absolute monotrait-heteromethod correlations
+  mean_within1 <- mean(abs(cor_data1[lower.tri(cor_data1)]), na.rm = TRUE)
+  mean_within2 <- mean(abs(cor_data2[lower.tri(cor_data2)]), na.rm = TRUE)
+  
+  # HTMT
+  htmt_value <- mean_between / sqrt(mean_within1 * mean_within2)
+  return(htmt_value)
+}
+
+# Calculate HTMT values
+htmt_EO_MAN <- compute_htmt(EO_items, MAN_items)
+htmt_EO_INN <- compute_htmt(EO_items, INN_items)
+htmt_MAN_INN <- compute_htmt(MAN_items, INN_items)
+
+# Display results
+cat("\n================ HTMT ================\n")
+cat("HTMT (EO, MAN)  =", round(htmt_EO_MAN, 2), "\n")
+cat("HTMT (EO, INN)  =", round(htmt_EO_INN, 2), "\n")
+cat("HTMT (MAN, INN) =", round(htmt_MAN_INN, 2), "\n")
+
+cat("\n================ rhoC and AVE ================\n")
+print(seminr::rhoC_AVE(pls_model))
+
+cat("\n================ rho_A ================\n")
+print(seminr::rho_A(pls_model, constructs = c("EO", "MAN", "INN")))
+
+# =========================================
+# 10. Collinearity assessment using VIF
+# =========================================
+scores <- as.data.frame(pls_model$construct_scores)
+
+cat("\n================ VIF ================\n")
+vif_model <- lm(INN ~ EO + MAN + `EO*MAN`, data = scores)
+print(car::vif(vif_model))
+
+# =========================================
+# 11. f-square effect sizes
+# =========================================
+R2_full <- summary(lm(INN ~ EO + MAN + `EO*MAN`, data = scores))$r.squared
+R2_no_EO <- summary(lm(INN ~ MAN + `EO*MAN`, data = scores))$r.squared
+R2_no_MAN <- summary(lm(INN ~ EO + `EO*MAN`, data = scores))$r.squared
+R2_no_INT <- summary(lm(INN ~ EO + MAN, data = scores))$r.squared
+
+f2_EO  <- (R2_full - R2_no_EO)  / (1 - R2_full)
+f2_MAN <- (R2_full - R2_no_MAN) / (1 - R2_full)
+f2_INT <- (R2_full - R2_no_INT) / (1 - R2_full)
+
+cat("\n================ f-square ================\n")
+cat("f² EO =", round(f2_EO, 4), "\n")
+cat("f² MAN =", round(f2_MAN, 4), "\n")
+cat("f² EO*MAN =", round(f2_INT, 4), "\n")
+
+
+# =========================================
+# 12. Predictive relevance (Q square)
+# Cross-validated construct-level approximation
+# =========================================
+
+# Function to compute cross-validated Q²
+compute_q2_cv <- function(data, formula, target, k = 10, seed = 123) {
+  set.seed(seed)
+  
+  n <- nrow(data)
+  folds <- sample(rep(1:k, length.out = n))
+  pred <- rep(NA, n)
+  
+  for (i in 1:k) {
+    train_data <- data[folds != i, , drop = FALSE]
+    test_data  <- data[folds == i, , drop = FALSE]
+    
+    model <- lm(formula, data = train_data)
+    pred[folds == i] <- predict(model, newdata = test_data)
+  }
+  
+  actual <- data[[target]]
+  
+  # Prediction error sum of squares
+  press <- sum((actual - pred)^2, na.rm = TRUE)
+  
+  # Sum of squares of observations around the grand mean
+  sso <- sum((actual - mean(actual, na.rm = TRUE))^2, na.rm = TRUE)
+  
+  q2 <- 1 - (press / sso)
+  
+  return(list(
+    Q2 = q2,
+    PRESS = press,
+    SSO = sso,
+    Predicted = pred
+  ))
+}
+
+# Q² for Innovation
+q2_inn <- compute_q2_cv(
+  data = scores,
+  formula = INN ~ EO + MAN + `EO*MAN`,
+  target = "INN",
+  k = 10,
+  seed = 123
+)
+
+cat("\n================ Q SQUARE ================\n")
+cat("Q² for INN =", round(q2_inn$Q2, 2), "\n")
+
+# Optional: Q² for Management
+q2_man <- compute_q2_cv(
+  data = scores,
+  formula = MAN ~ EO,
+  target = "MAN",
+  k = 10,
+  seed = 123
+)
+
+cat("Q² for MAN =", round(q2_man$Q2, 2), "\n")
+
+# =========================================
+# 13. Conceptual model visualization
+# =========================================
+DiagrammeR::grViz("
+digraph conceptual_model {
+  graph [layout = dot, rankdir = LR]
+
+  node [shape = box, style = filled, fillcolor = LightBlue, fontname = Helvetica]
+
+  EO  [label = 'Entrepreneurial Orientation']
+  MAN [label = 'Management']
+  INN [label = 'Innovation']
+  INT [label = 'EO x Management', fillcolor = LightYellow]
+
+  EO  -> MAN
+  EO  -> INN
+  MAN -> INN
+  INT -> INN
+
+  EO  -> INT [style = dashed]
+  MAN -> INT [style = dashed]
+}
+")
+
+# =========================================
+# 14. Built-in seminr visualizations
+# =========================================
+plot(pls_model, title = "PLS-SEM Model")
+plot(boot_pls, title = "Bootstrapped PLS-SEM Model")
+
+scores <- as.data.frame(pls_model$construct_scores)
